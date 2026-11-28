@@ -22,6 +22,19 @@ test("bin profile", async () => {
   const s = server(() => new Response(new Blob(parts), { headers: { "content-type": "application/vnd.flisk.cogito.bin" } }));
   expect(await collect(cogito(`http://localhost:${s.port}/`, {}, { start: "bin" }))).toEqual(frames); s.stop();
 });
+test("bin profile waits for the length byte after a lone frame type", async () => {
+  const hello = new TextEncoder().encode(JSON.stringify(frames[0].h));
+  const chunks = [[6], [hello.length, ...hello, 1], [2, 72, 105, 5], [0]];
+  const fetchImpl = Object.assign(async () => new Response(new ReadableStream({
+    start(controller) {
+      for (const chunk of chunks) controller.enqueue(Uint8Array.from(chunk));
+      controller.close();
+    },
+  }), { headers: { "content-type": "application/vnd.flisk.cogito.bin" } }), { preconnect() {} });
+
+  expect(await collect(cogito("https://example.test/", {}, { start: "bin", fetchImpl })))
+    .toEqual([frames[0], { t: "Hi" }, { d: 1 }]);
+});
 test("incomplete stream throws", async () => {
   const s = server(() => new Response(nd(frames.slice(0, 3)), { headers: { "content-type": "application/vnd.flisk.cogito+ndjson" } }));
   await expect(collect(cogito(`http://localhost:${s.port}/`, {}))).rejects.toThrow("without a done");

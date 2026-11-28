@@ -24,10 +24,10 @@ async function* parse(res) {
     const dec = new TextDecoder(); let buf = new Uint8Array(0);
     for await (const c of res.body) {
       const n = new Uint8Array(buf.length + c.length); n.set(buf); n.set(c, buf.length); buf = n;
-      for (;;) {
+      while (buf.length >= 2) {
         let len = 0, shift = 0, i = 1;
         while (i < buf.length) { const b = buf[i++]; len |= (b & 127) << shift; shift += 7; if (!(b & 128)) break; else if (i >= buf.length) { i = -1; break; } }
-        if (i < 0 || buf.length < 1 || i + len > buf.length) break;
+        if (i < 0 || i + len > buf.length) break;
         const type = buf[0], s = dec.decode(buf.subarray(i, i + len)); buf = buf.subarray(i + len);
         if (type === 5) { yield { d: 1 }; continue; }
         yield { [T[type]]: type === 1 || type === 2 || type === 8 ? s : JSON.parse(s) };
